@@ -1,24 +1,29 @@
 #pragma once
 
+#include "Constants.h"
+#include "Interconnect.h"
+
 #include <cstdint>
 #include <chrono>
 #include <thread>
 
 class CPU {
 	public:
-		const static uint32_t PC_RESET = 0xbfc00000;
-		const static float DEFAULT_CLOCK_FREQ;
+		CPU(Interconnect inter);
 
 		void start();
 		void reset();
 		void setClockFreq(float newClockFreq);
+		void executeNextInstruction();
 
 	private:
-		uint32_t PC = PC_RESET;
-		float clockFreq = DEFAULT_CLOCK_FREQ;
+		Interconnect inter;
+		uint32_t PC = Constants::BIOS_ADDRESS;
+		float clockFreq = Constants::DEFAULT_CLOCK_FREQ;
 		std::chrono::duration<float, std::milli> periodDuration = std::chrono::duration<float, std::milli>(1000/clockFreq);
 
-		void executeNextInstruction();
+		
 		void executeInstruction(uint32_t instruction);
+		uint32_t load32(uint32_t address) const;
 };
 

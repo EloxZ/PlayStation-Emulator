@@ -1,5 +1,6 @@
 #include "BIOS.h"
 #include "CPU.h"
+#include "Interconnect.h"
 
 #include <iostream>
 #include <cstdint>
@@ -7,3 +8,4 @@
 
 void runTests();
 void testBIOS();
+void testFetching();
