@@ -30,15 +30,26 @@ void CPU::setClockFreq(float newClockFreq) {
 
 
 void CPU::executeNextInstruction() {
-	uint32_t instructionData = load32(PC);
+	Instruction instruction = nextInstruction;
+	uint32_t nextInstructionData = load32(PC);
+	nextInstruction = Instruction(nextInstructionData);
+
 	PC += 4;
 
-	Instruction instruction(instructionData);
 	executeInstruction(instruction);
 }
 
 void CPU::executeInstruction(Instruction instruction) {
 	switch (instruction.function()) {
+		case 0b000000:
+			switch (instruction.subfunction()) {
+				case 0b000000:
+					op_sll(instruction);
+					break;
+				default:
+					throw std::runtime_error("Error executing instruction: " + Utils::wordToString(instruction.getData()));
+			}
+			break;
 		case 0b001111:
 			op_lui(instruction);
 			break;
@@ -83,13 +94,42 @@ void CPU::op_ori(Instruction instruction) {
 }
 
 void CPU::op_sw(Instruction instruction) {
-	uint32_t imm = instruction.imm();
+	uint32_t imm_se = instruction.imm_se();
 	uint32_t t = instruction.t();
 	uint32_t s = instruction.s();
 
-	uint32_t addr = getReg(s) + imm;
+	uint32_t addr = getReg(s) + imm_se;
 	uint32_t v = getReg(t);
 
 	store32(addr, v);
+}
+
+void CPU::op_sll(Instruction instruction) {
+	// NOP, do nothing.
+}
+
+void CPU::op_addiu(Instruction instruction) {
+	uint32_t imm_se = instruction.imm_se();
+	uint32_t t = instruction.t();
+	uint32_t s = instruction.s();
+
+	uint32_t v = getReg(s) + imm_se;
+
+	setReg(t, v);
+}
+
+void CPU::op_j(Instruction instruction) {
+	uint32_t imm_jump = instruction.imm_jump();
+	PC = (PC & 0xf0000000) | (imm_jump << 2);
+}
+
+void CPU::op_or(Instruction instruction) {
+	uint32_t d = instruction.d();
+	uint32_t t = instruction.t();
+	uint32_t s = instruction.s();
+
+	uint32_t v = getReg(s) | getReg(t);
+
+	setReg(d, v);
 }
 

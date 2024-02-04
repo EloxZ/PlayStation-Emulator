@@ -11,7 +11,7 @@
 
 class BIOS {
 	public:
-		BIOS(std::string path); // Throws Runtime Error
+		BIOS(std::string path);
 
 		uint32_t load32(uint32_t offset) const;
 		const std::vector<uint8_t>& getData() const;
