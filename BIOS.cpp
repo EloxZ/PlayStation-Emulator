@@ -7,12 +7,8 @@ BIOS::BIOS(std::string path) {
 		throw std::runtime_error("Error reading BIOS file: " + path);
 	}
 
-	std::vector<char> bytes((std::istreambuf_iterator<char>(input)), (std::istreambuf_iterator<char>()));
-	unsigned int i = 0;
-	for (char byte : bytes) {
-		data[i] = byte;
-		i++;
-	}
+	std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(input)), (std::istreambuf_iterator<char>()));
+	data = bytes;
 
 	input.close();
 }
@@ -28,6 +24,6 @@ uint32_t BIOS::load32(uint32_t offset) const {
 	return b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
 }
 
-const uint8_t* BIOS::getData() const {
+const std::vector<uint8_t>& BIOS::getData() const {
 	return data;
 }

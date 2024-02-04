@@ -11,9 +11,9 @@ void testBIOS() {
 
     try {
         std::cout << "Loading BIOS file in " << biosPath << std::endl;
-        std::unique_ptr<BIOS> bios{std::make_unique<BIOS>(biosPath)};
+        BIOS bios(biosPath);
 
-        const uint8_t* biosData = bios->getData();
+        std::vector<uint8_t> biosData = bios.getData();
 
         std::cout << "BIOS Data (First Address):" << std::endl;
         for (size_t i = 0; i < 16; ++i) {
@@ -31,11 +31,14 @@ void testFetching() {
     const std::string biosPath = "./files/bios/scph5501.bin";
 
     try {
-        std::unique_ptr<BIOS> bios{std::make_unique<BIOS>(biosPath)};
-        std::unique_ptr<Interconnect> inter{std::make_unique<Interconnect>(*bios)};
-        std::unique_ptr<CPU> cpu{std::make_unique<CPU>(*inter)};
+        BIOS bios(biosPath);
+        Interconnect inter(bios);
+        CPU cpu(inter);
 
-        cpu->executeNextInstruction();
+        while (true) {
+            cpu.executeNextInstruction();
+        }
+        
 
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
