@@ -10,7 +10,7 @@ class Instruction {
 		uint32_t s() const;
 		uint32_t t() const;
 		uint32_t imm() const;
-		uint32_t imm_se() const
+		uint32_t imm_se() const;
 		uint32_t imm_jump() const;
 		uint32_t d() const;
 		uint32_t subfunction() const;

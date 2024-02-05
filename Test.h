@@ -9,3 +9,4 @@
 void runTests();
 void testBIOS();
 void testFetching();
+void testAddWithSignedOverflowCheck();

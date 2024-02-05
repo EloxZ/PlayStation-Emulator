@@ -23,7 +23,7 @@ void Interconnect::store32(uint32_t address, uint32_t value) {
 		throw std::runtime_error("Unaligned address at Interconnect::store32: " + Utils::wordToString(address));
 	}
 
-	std::optional<uint32_t> offset = Constants::MEM_CONTROL_RANGE.contains(address);
+	std::optional<uint32_t> offset = Constants::SYS_CONTROL_RANGE.contains(address);
 
 	if (offset.has_value()) {
 		switch (offset.value()) {
