@@ -24,6 +24,11 @@ uint32_t BIOS::load32(uint32_t offset) const {
 	return b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
 }
 
+uint8_t BIOS::load8(uint32_t offset) const {
+	return data[static_cast<size_t>(offset)];
+}
+
+
 const std::vector<uint8_t>& BIOS::getData() const {
 	return data;
 }

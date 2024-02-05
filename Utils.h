@@ -9,5 +9,9 @@ class Utils {
 		const static std::string wordToString(uint32_t word);
 		const static bool addWithSignedOverflowCheck(uint32_t a, uint32_t b, uint32_t& result);
 		const static bool isSignedNegative(uint32_t a);
+		const static uint32_t maskRegion(uint32_t address);
+
+	private:
+		const static uint32_t REGION_MASK[8];
 };
 

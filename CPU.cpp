@@ -78,10 +78,21 @@ uint32_t CPU::load32(uint32_t address) const {
 	return inter.load32(address);
 }
 
+uint8_t CPU::load8(uint32_t address) const {
+	return inter.load8(address);
+}
+
 void CPU::store32(uint32_t address, uint32_t value) {
 	inter.store32(address, value);
 }
 
+void CPU::store16(uint32_t address, uint16_t value) {
+	inter.store16(address, value);
+}
+
+void CPU::store8(uint32_t address, uint8_t value) {
+	inter.store8(address, value);
+}
 
 void CPU::op_lui(Instruction instruction) {
 	uint32_t imm = instruction.imm();
@@ -103,6 +114,26 @@ void CPU::op_ori(Instruction instruction) {
 	setReg(t, v);
 }
 
+void CPU::op_or(Instruction instruction) {
+	uint32_t d = instruction.d();
+	uint32_t t = instruction.t();
+	uint32_t s = instruction.s();
+
+	uint32_t v = getReg(s) | getReg(t);
+
+	setReg(d, v);
+}
+
+void CPU::op_andi(Instruction instruction) {
+	uint32_t imm = instruction.imm();
+	uint32_t t = instruction.t();
+	uint32_t s = instruction.s();
+
+	uint32_t v = getReg(s) & imm;
+
+	setReg(t, v);
+}
+
 void CPU::op_sw(Instruction instruction) {
 	if ((SR & 0x10000) != 0) {
 		// Cache is isolated, ignore write.
@@ -119,6 +150,38 @@ void CPU::op_sw(Instruction instruction) {
 	store32(addr, v);
 }
 
+void CPU::op_sh(Instruction instruction) {
+	if ((SR & 0x10000) != 0) {
+		// Cache is isolated, ignore write.
+		return;
+	}
+
+	uint32_t imm_se = instruction.imm_se();
+	uint32_t t = instruction.t();
+	uint32_t s = instruction.s();
+
+	uint32_t addr = getReg(s) + imm_se;
+	uint32_t v = getReg(t);
+
+	store16(addr, static_cast<uint16_t>(v));
+}
+
+void CPU::op_sb(Instruction instruction) {
+	if ((SR & 0x10000) != 0) {
+		// Cache is isolated, ignore write.
+		return;
+	}
+
+	uint32_t imm_se = instruction.imm_se();
+	uint32_t t = instruction.t();
+	uint32_t s = instruction.s();
+
+	uint32_t addr = getReg(s) + imm_se;
+	uint32_t v = getReg(t);
+
+	store8(addr, static_cast<uint8_t>(v));
+}
+
 void CPU::op_lw(Instruction instruction) {
 	if ((SR & 0x10000) != 0) {
 		// Cache is isolated, ignore write.
@@ -131,6 +194,21 @@ void CPU::op_lw(Instruction instruction) {
 
 	uint32_t addr = getReg(s) + imm_se;
 	uint32_t v = load32(addr);
+
+	load = std::make_tuple(t, v);
+}
+
+void CPU::op_lb(Instruction instruction) {
+	uint32_t imm_se = instruction.imm_se();
+	uint32_t t = instruction.t();
+	uint32_t s = instruction.s();
+
+	uint32_t addr = getReg(s) + imm_se;
+	uint32_t v = load8(addr);
+
+	if (v & 0x80) {
+		v |= 0xffffff00;
+	}
 
 	load = std::make_tuple(t, v);
 }
@@ -188,15 +266,19 @@ void CPU::op_j(Instruction instruction) {
 	PC = (PC & 0xf0000000) | (imm_jump << 2);
 }
 
-void CPU::op_or(Instruction instruction) {
-	uint32_t d = instruction.d();
-	uint32_t t = instruction.t();
-	uint32_t s = instruction.s();
-
-	uint32_t v = getReg(s) | getReg(t);
-
-	setReg(d, v);
+void CPU::op_jal(Instruction instruction) {
+	uint32_t ra = PC;
+	
+	setReg(31, ra);
+	
+	op_j(instruction);
 }
+
+void CPU::op_jr(Instruction instruction) {
+	uint32_t s = instruction.s();
+	PC = getReg(s);
+}
+
 
 void CPU::branch(uint32_t offset) {
 	uint32_t alignedOffset = offset << 2;
@@ -216,6 +298,17 @@ void CPU::op_bne(Instruction instruction) {
 		branch(imm_se);
 	}
 }
+
+void CPU::op_beq(Instruction instruction) {
+	uint32_t imm_se = instruction.imm_se();
+	uint32_t t = instruction.t();
+	uint32_t s = instruction.s();
+
+	if (getReg(s) == getReg(t)) {
+		branch(imm_se);
+	}
+}
+
 
 void CPU::op_cop0(Instruction instruction) {
 	switch (instruction.s()) {

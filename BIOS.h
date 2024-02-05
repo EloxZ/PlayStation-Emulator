@@ -14,6 +14,8 @@ class BIOS {
 		BIOS(std::string path);
 
 		uint32_t load32(uint32_t offset) const;
+		uint8_t load8(uint32_t offset) const;
+
 		const std::vector<uint8_t>& getData() const;
 	
 	private:

@@ -24,11 +24,23 @@ class Constants {
 		const static uint32_t RAM_ADDRESS = 0x00000000;
 		const static size_t RAM_SIZE = 2 * 1024 * 1024;
 
+		const static uint32_t SPU_ADDRESS = 0x1f801c00;
+		const static size_t SPU_SIZE = 640;
+
+		const static uint32_t EXPANSION1_ADDRESS = 0x1f000000;
+		const static size_t EXPANSION1_SIZE = 512 * 1024;
+
+		const static uint32_t EXPANSION2_ADDRESS = 0x1f802000;
+		const static size_t EXPANSION2_SIZE = 66;
+
 		const static Range BIOS_RANGE;
 		const static Range SYS_CONTROL_RANGE;
 		const static Range RAM_CONFIG_REG_RANGE;
 		const static Range CACHE_CONTROL_RANGE;
 		const static Range RAM_RANGE;
+		const static Range SPU_RANGE;
+		const static Range EXPANSION1_RANGE;
+		const static Range EXPANSION2_RANGE;
 
 };
 

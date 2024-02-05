@@ -2,7 +2,7 @@
 
 void runTests() {
     std::cout << "### Tests ###" << std::endl << std::endl;
-    testAddWithSignedOverflowCheck();
+    testFetching();
 }
 
 void testBIOS() {

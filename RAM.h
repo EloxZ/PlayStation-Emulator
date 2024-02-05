@@ -11,6 +11,8 @@
 
 class RAM {
 	public:
+		RAM();
+
 		uint32_t load32(uint32_t offset) const;
 		void store32(uint32_t offset, uint32_t value);
 		const std::vector<uint8_t>& getData() const;
