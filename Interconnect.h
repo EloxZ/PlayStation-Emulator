@@ -1,13 +1,14 @@
 #pragma once
 
 #include "BIOS.h"
+#include "RAM.h"
 #include "Range.h"
 #include "Constants.h"
 #include "Utils.h"
 
 class Interconnect {
 	public:
-		Interconnect(BIOS bios);
+		Interconnect(BIOS bios, RAM ram);
 
 		uint32_t load32(uint32_t address) const;
 		uint8_t load8(uint32_t address) const;
@@ -18,5 +19,6 @@ class Interconnect {
 
 	private:
 		BIOS bios;
+		RAM ram;
 };
 

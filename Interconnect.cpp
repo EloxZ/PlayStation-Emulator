@@ -1,6 +1,6 @@
 #include "Interconnect.h"
 
-Interconnect::Interconnect(BIOS bios) : bios(bios) {
+Interconnect::Interconnect(BIOS bios, RAM ram) : bios(bios), ram(ram) {
 
 }
 
@@ -21,7 +21,13 @@ uint32_t Interconnect::load32(uint32_t address) const {
 
 uint8_t Interconnect::load8(uint32_t address) const {
 	uint32_t absAddress = Utils::maskRegion(address);
-	std::optional<uint32_t> offset = Constants::BIOS_RANGE.contains(absAddress);
+	std::optional<uint32_t> offset = Constants::RAM_RANGE.contains(absAddress);
+
+	if (offset.has_value()) {
+		return ram.load8(offset.value());
+	}
+
+	offset = Constants::BIOS_RANGE.contains(absAddress);
 
 	if (offset.has_value()) {
 		return bios.load8(offset.value());
@@ -66,6 +72,13 @@ void Interconnect::store32(uint32_t address, uint32_t value) {
 		return;
 	}
 
+	offset = Constants::IRQ_CONTROL_RANGE.contains(absAddress);
+
+	if (offset.has_value()) {
+		// IRQ CONTROL not implemented.
+		return;
+	}
+
 	throw std::runtime_error("Error at Interconnect::store32 with address: " + Utils::wordToString(address));
 }
 
@@ -87,7 +100,14 @@ void Interconnect::store16(uint32_t address, uint16_t value) {
 
 void Interconnect::store8(uint32_t address, uint8_t value) {
 	uint32_t absAddress = Utils::maskRegion(address);
-	std::optional<uint32_t> offset = Constants::EXPANSION2_RANGE.contains(absAddress);
+	std::optional<uint32_t> offset = Constants::RAM_RANGE.contains(absAddress);
+
+	if (offset.has_value()) {
+		ram.store8(offset.value(), value);
+		return;
+	}
+
+	offset = Constants::EXPANSION2_RANGE.contains(absAddress);
 
 	if (offset.has_value()) {
 		// Unhandled write to EXPANSION 2

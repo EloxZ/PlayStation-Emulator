@@ -28,6 +28,8 @@ class CPU {
 		Interconnect inter;
 		uint32_t PC = Constants::BIOS_ADDRESS;
 		uint32_t SR = 0;
+		uint32_t HI = 0;
+		uint32_t LO = 0;
 		float clockFreq = Constants::DEFAULT_CLOCK_FREQ;
 		std::chrono::duration<float, std::milli> periodDuration = std::chrono::duration<float, std::milli>(1000/clockFreq);
 		Instruction nextInstruction = Instruction(0);
@@ -46,25 +48,36 @@ class CPU {
 		void op_ori(Instruction instruction);
 		void op_or(Instruction instruction);
 		void op_andi(Instruction instruction);
+		void op_and(Instruction instruction);
 		void op_sw(Instruction instruction);
 		void op_sh(Instruction instruction);
 		void op_sb(Instruction instruction);
 		void op_lw(Instruction instruction);
 		void op_lb(Instruction instruction);
+		void op_lbu(Instruction instruction);
 		void op_sll(Instruction instruction);
 		void op_sltu(Instruction instruction);
+		void op_slti(Instruction instruction);
+		void op_add(Instruction instruction);
 		void op_addiu(Instruction instruction);
 		void op_addi(Instruction instruction);
 		void op_addu(Instruction instruction);
+		void op_subu(Instruction instruction);
+		void op_sra(Instruction instruction);
 		void op_j(Instruction instruction);
 		void op_jal(Instruction instruction);
+		void op_jalr(Instruction instruction);
 		void op_jr(Instruction instruction);
 
 		void branch(uint32_t offset);
 		void op_bne(Instruction instruction);
 		void op_beq(Instruction instruction);
+		void op_bgtz(Instruction instruction);
+		void op_blez(Instruction instruction);
+		void op_bxx(Instruction instruction); // bgez bltz bgezal bltzal
 
 		void op_cop0(Instruction instruction);
 		void op_mtc0(Instruction instruction);
+		void op_mfc0(Instruction instruction);
 };
 

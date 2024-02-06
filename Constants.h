@@ -33,6 +33,9 @@ class Constants {
 		const static uint32_t EXPANSION2_ADDRESS = 0x1f802000;
 		const static size_t EXPANSION2_SIZE = 66;
 
+		const static uint32_t IRQ_CONTROL_ADDRESS = 0x1f801070;
+		const static size_t IRQ_CONTROL_SIZE = 8;
+
 		const static Range BIOS_RANGE;
 		const static Range SYS_CONTROL_RANGE;
 		const static Range RAM_CONFIG_REG_RANGE;
@@ -41,6 +44,7 @@ class Constants {
 		const static Range SPU_RANGE;
 		const static Range EXPANSION1_RANGE;
 		const static Range EXPANSION2_RANGE;
+		const static Range IRQ_CONTROL_RANGE;
 
 };
 

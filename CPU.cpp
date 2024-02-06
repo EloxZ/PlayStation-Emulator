@@ -134,6 +134,16 @@ void CPU::op_andi(Instruction instruction) {
 	setReg(t, v);
 }
 
+void CPU::op_and(Instruction instruction) {
+	uint32_t d = instruction.d();
+	uint32_t t = instruction.t();
+	uint32_t s = instruction.s();
+
+	uint32_t v = getReg(s) & getReg(t);
+
+	setReg(d, v);
+}
+
 void CPU::op_sw(Instruction instruction) {
 	if ((SR & 0x10000) != 0) {
 		// Cache is isolated, ignore write.
@@ -213,6 +223,17 @@ void CPU::op_lb(Instruction instruction) {
 	load = std::make_tuple(t, v);
 }
 
+void CPU::op_lbu(Instruction instruction) {
+	uint32_t imm_se = instruction.imm_se();
+	uint32_t t = instruction.t();
+	uint32_t s = instruction.s();
+
+	uint32_t addr = getReg(s) + imm_se;
+	uint32_t v = load8(addr);
+
+	load = std::make_tuple(t, v);
+}
+
 void CPU::op_sll(Instruction instruction) {
 	// NOP, do nothing.
 }
@@ -223,6 +244,30 @@ void CPU::op_sltu(Instruction instruction) {
 	uint32_t s = instruction.s();
 
 	uint32_t v = getReg(s) < getReg(t);
+
+	setReg(d, v);
+}
+
+void CPU::op_slti(Instruction instruction) {
+	uint32_t imm_se = instruction.imm_se();
+	uint32_t t = instruction.t();
+	uint32_t s = instruction.s();
+
+	uint32_t v = Utils::isSignedNegative(getReg(s) - imm_se);
+
+	setReg(t, v);
+}
+
+void CPU::op_add(Instruction instruction) {
+	uint32_t d = instruction.d();
+	uint32_t t = instruction.t();
+	uint32_t s = instruction.s();
+
+	uint32_t v;
+
+	if (Utils::addWithSignedOverflowCheck(getReg(s), getReg(t), v)) {
+		throw std::overflow_error("Overflow during addition at op_add: " + Utils::wordToString(getReg(s)) + " + " + Utils::wordToString(imm_se) + " = " + Utils::wordToString(v));
+	}
 
 	setReg(d, v);
 }
@@ -261,6 +306,26 @@ void CPU::op_addu(Instruction instruction) {
 	setReg(d, v);
 }
 
+void CPU::op_subu(Instruction instruction) {
+	uint32_t d = instruction.d();
+	uint32_t t = instruction.t();
+	uint32_t s = instruction.s();
+
+	uint32_t v = getReg(s) - getReg(t);
+
+	setReg(d, v);
+}
+
+void CPU::op_sra(Instruction instruction) {
+	uint32_t shift = instruction.shift();
+	uint32_t t = instruction.t();
+	uint32_t d = instruction.d();
+
+	uint32_t v = Utils::signedRightShift(getReg(t), shift);
+
+	setReg(d, v);
+}
+
 void CPU::op_j(Instruction instruction) {
 	uint32_t imm_jump = instruction.imm_jump();
 	PC = (PC & 0xf0000000) | (imm_jump << 2);
@@ -272,6 +337,16 @@ void CPU::op_jal(Instruction instruction) {
 	setReg(31, ra);
 	
 	op_j(instruction);
+}
+
+void CPU::op_jalr(Instruction instruction) {
+	uint32_t d = instruction.d();
+	uint32_t s = instruction.s();
+	uint32_t ra = PC;
+
+	setReg(d, ra);
+
+	PC = getReg(s);
 }
 
 void CPU::op_jr(Instruction instruction) {
@@ -305,6 +380,51 @@ void CPU::op_beq(Instruction instruction) {
 	uint32_t s = instruction.s();
 
 	if (getReg(s) == getReg(t)) {
+		branch(imm_se);
+	}
+}
+
+void CPU::op_bgtz(Instruction instruction) {
+	uint32_t imm_se = instruction.imm_se();
+	uint32_t s = instruction.s();
+
+	uint32_t v = getReg(s);
+
+	if (!Utils::isSignedNegative(v) && v != 0) {
+		branch(imm_se);
+	}
+}
+
+void CPU::op_blez(Instruction instruction) {
+	uint32_t imm_se = instruction.imm_se();
+	uint32_t s = instruction.s();
+
+	uint32_t v = getReg(s);
+
+	if (Utils::isSignedNegative(v) || v == 0) {
+		branch(imm_se);
+	}
+}
+
+void CPU::op_bxx(Instruction instruction) {
+	uint32_t imm_se = instruction.imm_se();
+	uint32_t s = instruction.s();
+	uint32_t instructionData = instruction.getData();
+
+	uint32_t v = getReg(s);
+
+	bool isBgez = (instructionData >> 16) & 1;
+	bool isLink = (instructionData >> 20) & 1;
+
+	bool test = Utils::isSignedNegative(v);
+	test ^= isBgez;
+
+	if (test) {
+		if (isLink) {
+			uint32_t ra = PC;
+			setReg(31, ra);
+		}
+
 		branch(imm_se);
 	}
 }
@@ -343,5 +463,25 @@ void CPU::op_mtc0(Instruction instruction) {
 		default:
 			throw std::runtime_error("Unhandled mtc0 register: " + Utils::wordToString(cop_r));
 	}
+}
+
+void CPU::op_mfc0(Instruction instruction) {
+	uint32_t cpu_r = instruction.t();
+	uint32_t cop_r = instruction.d();
+
+	uint32_t v;
+
+	switch (cop_r) {
+		case 12:
+			v = SR;
+			break;
+		case 13:
+			throw std::runtime_error("Unhandled read from CAUSE register: " + Utils::wordToString(cop_r));
+			break;
+		default:
+			throw std::runtime_error("Unhandled read from cop0r: " + Utils::wordToString(cop_r));
+	}
+
+	load = std::make_tuple(cpu_r, v);
 }
 

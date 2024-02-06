@@ -36,3 +36,27 @@ const uint32_t Utils::maskRegion(uint32_t address) {
 
     return address & REGION_MASK[index];
 }
+
+const uint32_t Utils::signedRightShift(uint32_t value, uint32_t shift) {
+    if (shift > 32) shift = 32;
+    if (isSignedNegative(value)) {
+        uint32_t shiftedValue = value >> shift;
+        uint32_t sign = 0xffffffff << 32 - shift;
+
+        return shiftedValue | sign;
+    } else {
+        return value >> shift;
+    }
+}
+
+const uint32_t Utils::signedLeftShift(uint32_t value, uint32_t shift) {
+    if (shift > 32) shift = 32;
+    if (isSignedNegative(value)) {
+        uint32_t shiftedValue = value << shift;
+        uint32_t sign = 0xffffffff << 32 - shift;
+
+        return shiftedValue | sign;
+    } else {
+        return value >> shift;
+    }
+}
