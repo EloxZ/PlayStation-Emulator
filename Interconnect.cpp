@@ -16,6 +16,14 @@ uint32_t Interconnect::load32(uint32_t address) const {
 		return bios.load32(offset.value());
 	}
 
+	offset = Constants::IRQ_CONTROL_RANGE.contains(absAddress);
+
+	if (offset.has_value()) {
+		// IRQ control read
+		return 0;
+	}
+
+
 	throw std::runtime_error("Error at Interconnect::load32 with address: " + Utils::wordToString(address));
 }
 
@@ -92,6 +100,20 @@ void Interconnect::store16(uint32_t address, uint16_t value) {
 
 	if (offset.has_value()) {
 		// Unhandled write to SPU
+		return;
+	}
+
+	offset = Constants::TIMERS_RANGE.contains(absAddress);
+
+	if (offset.has_value()) {
+		// Unhandled write to timer register
+		return;
+	}
+
+	offset = Constants::RAM_RANGE.contains(absAddress);
+
+	if (offset.has_value()) {
+		ram.store16(offset.value(), value);
 		return;
 	}
 

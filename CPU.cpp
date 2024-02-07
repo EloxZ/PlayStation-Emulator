@@ -30,11 +30,23 @@ void CPU::setClockFreq(float newClockFreq) {
 
 
 void CPU::executeNextInstruction() {
-	Instruction instruction = nextInstruction;
-	uint32_t nextInstructionData = load32(PC);
-	nextInstruction = Instruction(nextInstructionData);
+	currentPC = PC;
 
-	PC += 4;
+	if (currentPC % 4 != 0) {
+		exception(Exception::LOAD_ADDRESS_ERROR);
+		return;
+	}
+
+	Instruction instruction(load32(PC));
+
+	std::cout << "Fetching " << Utils::wordToString(instruction.getData()) << " with PC = " << Utils::wordToString(PC) << std::endl;
+	
+	// Delay
+	delaySlot = branchOccured;
+	branchOccured = false;
+
+	PC = nextPC;
+	nextPC += 4;
 
 	// Pending load
 	setReg(std::get<0>(load), std::get<1>(load));
@@ -93,6 +105,41 @@ void CPU::store16(uint32_t address, uint16_t value) {
 void CPU::store8(uint32_t address, uint8_t value) {
 	inter.store8(address, value);
 }
+
+
+void CPU::exception(Exception exception) {
+	uint32_t handler = (SR & (1 << 22))? 0xbfc00180 : 0x80000080;
+	uint32_t mode = SR & 0x3f;
+
+	SR &= ~0x3f;
+	SR |= (mode << 2) & 0x3f;
+
+	cause = static_cast<uint32_t>(static_cast<int32_t>(exception) << 2);
+	EPC = currentPC;
+
+	if (delaySlot) {
+		EPC -= 4;
+		cause |= 1 << 31;
+	}
+
+	PC = handler;
+	nextPC = PC + 4;
+}
+
+void CPU::op_syscall(Instruction instruction) {
+	exception(Exception::SYS_CALL);
+}
+
+void CPU::op_rfe(Instruction instruction) {
+	if ((instruction.getData() & 0x3f) != 0b010000) {
+		// Invalid cop0 instruction
+	}
+
+	uint32_t mode = SR & 0x3f;
+	SR &= ~0x3f;
+	SR |= mode >> 2;
+}
+
 
 void CPU::op_lui(Instruction instruction) {
 	uint32_t imm = instruction.imm();
@@ -155,9 +202,13 @@ void CPU::op_sw(Instruction instruction) {
 	uint32_t s = instruction.s();
 
 	uint32_t addr = getReg(s) + imm_se;
-	uint32_t v = getReg(t);
 
-	store32(addr, v);
+	if (addr % 4 == 0) {
+		uint32_t v = getReg(t);
+		store32(addr, v);
+	} else {
+		exception(Exception::STORE_ADDRESS_ERROR);
+	}
 }
 
 void CPU::op_sh(Instruction instruction) {
@@ -171,9 +222,13 @@ void CPU::op_sh(Instruction instruction) {
 	uint32_t s = instruction.s();
 
 	uint32_t addr = getReg(s) + imm_se;
-	uint32_t v = getReg(t);
 
-	store16(addr, static_cast<uint16_t>(v));
+	if (addr % 2 == 0) {
+		uint32_t v = getReg(t);
+		store16(addr, static_cast<uint16_t>(v));
+	} else {
+		exception(Exception::STORE_ADDRESS_ERROR);
+	}
 }
 
 void CPU::op_sb(Instruction instruction) {
@@ -203,9 +258,13 @@ void CPU::op_lw(Instruction instruction) {
 	uint32_t s = instruction.s();
 
 	uint32_t addr = getReg(s) + imm_se;
-	uint32_t v = load32(addr);
 
-	load = std::make_tuple(t, v);
+	if (addr % 4 == 0) {
+		uint32_t v = load32(addr);
+		load = std::make_tuple(t, v);
+	} else {
+		exception(Exception::LOAD_ADDRESS_ERROR);
+	}
 }
 
 void CPU::op_lb(Instruction instruction) {
@@ -238,6 +297,19 @@ void CPU::op_sll(Instruction instruction) {
 	// NOP, do nothing.
 }
 
+void CPU::op_slt(Instruction instruction) {
+	uint32_t d = instruction.d();
+	uint32_t t = instruction.t();
+	uint32_t s = instruction.s();
+
+	int32_t ss = static_cast<int32_t>(getReg(s));
+	int32_t st = static_cast<int32_t>(getReg(t));
+
+	bool v = s < t;
+
+	setReg(d, static_cast<uint32_t>(v));
+}
+
 void CPU::op_sltu(Instruction instruction) {
 	uint32_t d = instruction.d();
 	uint32_t t = instruction.t();
@@ -258,6 +330,22 @@ void CPU::op_slti(Instruction instruction) {
 	setReg(t, v);
 }
 
+void CPU::op_sltiu(Instruction instruction) {
+	uint32_t t = instruction.t();
+	uint32_t s = instruction.s();
+
+	uint32_t n = getReg(s);
+	uint32_t d = getReg(t);
+
+	if (d == 0) {
+		HI = n;
+		LO = 0xffffffff;
+	} else {
+		HI = n % d;
+		LO = n / d;
+	}
+}
+
 void CPU::op_add(Instruction instruction) {
 	uint32_t d = instruction.d();
 	uint32_t t = instruction.t();
@@ -266,7 +354,8 @@ void CPU::op_add(Instruction instruction) {
 	uint32_t v;
 
 	if (Utils::addWithSignedOverflowCheck(getReg(s), getReg(t), v)) {
-		throw std::overflow_error("Overflow during addition at op_add: " + Utils::wordToString(getReg(s)) + " + " + Utils::wordToString(imm_se) + " = " + Utils::wordToString(v));
+		exception(Exception::OVER_FLOW);
+		return;
 	}
 
 	setReg(d, v);
@@ -290,7 +379,8 @@ void CPU::op_addi(Instruction instruction) {
 	uint32_t v;
 
 	if (Utils::addWithSignedOverflowCheck(getReg(s), imm_se, v)) {
-		throw std::overflow_error("Overflow during addition at op_addi: " + Utils::wordToString(getReg(s)) + " + " + Utils::wordToString(imm_se) + " = " + Utils::wordToString(v));
+		exception(Exception::OVER_FLOW);
+		return;
 	}
 
 	setReg(t, v);
@@ -326,13 +416,23 @@ void CPU::op_sra(Instruction instruction) {
 	setReg(d, v);
 }
 
+void CPU::op_srl(Instruction instruction) {
+	uint32_t shift = instruction.shift();
+	uint32_t t = instruction.t();
+	uint32_t d = instruction.d();
+
+	uint32_t v = getReg(t) >> shift;
+
+	setReg(d, v);
+}
+
 void CPU::op_j(Instruction instruction) {
 	uint32_t imm_jump = instruction.imm_jump();
-	PC = (PC & 0xf0000000) | (imm_jump << 2);
+	nextPC = (nextPC & 0xf0000000) | (imm_jump << 2);
 }
 
 void CPU::op_jal(Instruction instruction) {
-	uint32_t ra = PC;
+	uint32_t ra = nextPC;
 	
 	setReg(31, ra);
 	
@@ -342,26 +442,71 @@ void CPU::op_jal(Instruction instruction) {
 void CPU::op_jalr(Instruction instruction) {
 	uint32_t d = instruction.d();
 	uint32_t s = instruction.s();
-	uint32_t ra = PC;
+	uint32_t ra = nextPC;
 
 	setReg(d, ra);
 
-	PC = getReg(s);
+	nextPC = getReg(s);
 }
 
 void CPU::op_jr(Instruction instruction) {
 	uint32_t s = instruction.s();
-	PC = getReg(s);
+	nextPC = getReg(s);
+}
+
+void CPU::op_div(Instruction instruction) {
+	uint32_t s = instruction.s();
+	uint32_t t = instruction.t();
+
+	int32_t n = static_cast<int32_t>(getReg(s));
+	int32_t d = static_cast<int32_t>(getReg(t));
+
+	if (d == 0) {
+		HI = static_cast<uint32_t>(n);
+
+		if (n >= 0) {
+			LO = 0xffffffff;
+		} else {
+			LO = 1;
+		}
+	} else if (static_cast<uint32_t>(n) == 0x80000000 && d == -1) {
+		HI = 0;
+		LO = 0x80000000;
+	} else {
+		HI = static_cast<uint32_t>(n % d);
+		LO = static_cast<uint32_t>(n / d);
+	}
+}
+
+void CPU::op_mflo(Instruction instruction) {
+	uint32_t d = instruction.d();
+	setReg(d, LO);
+}
+
+void CPU::op_mfhi(Instruction instruction) {
+	uint32_t d = instruction.d();
+	setReg(d, HI);
+}
+
+void CPU::op_mtlo(Instruction instruction) {
+	uint32_t s = instruction.s();
+	LO = getReg(s);
+}
+
+void CPU::op_mthi(Instruction instruction) {
+	uint32_t s = instruction.s();
+	HI = getReg(s);
 }
 
 
 void CPU::branch(uint32_t offset) {
 	uint32_t alignedOffset = offset << 2;
-	uint32_t calculatedPC = PC;
+	uint32_t calculatedPC = nextPC;
 
 	calculatedPC += alignedOffset - 4;
 
-	PC = calculatedPC;
+	branchOccured = true;
+	nextPC = calculatedPC;
 }
 
 void CPU::op_bne(Instruction instruction) {
@@ -421,7 +566,7 @@ void CPU::op_bxx(Instruction instruction) {
 
 	if (test) {
 		if (isLink) {
-			uint32_t ra = PC;
+			uint32_t ra = nextPC;
 			setReg(31, ra);
 		}
 
@@ -432,8 +577,14 @@ void CPU::op_bxx(Instruction instruction) {
 
 void CPU::op_cop0(Instruction instruction) {
 	switch (instruction.s()) {
+		case 0b00000:
+			op_mfc0(instruction);
+			break;
 		case 0b00100:
 			op_mtc0(instruction);
+			break;
+		case 0b10000:
+			op_rfe(instruction);
 			break;
 		default:
 			throw std::runtime_error("Error executing instruction: " + Utils::wordToString(instruction.getData()));
@@ -476,7 +627,10 @@ void CPU::op_mfc0(Instruction instruction) {
 			v = SR;
 			break;
 		case 13:
-			throw std::runtime_error("Unhandled read from CAUSE register: " + Utils::wordToString(cop_r));
+			v = cause;
+			break;
+		case 14:
+			v = EPC;
 			break;
 		default:
 			throw std::runtime_error("Unhandled read from cop0r: " + Utils::wordToString(cop_r));

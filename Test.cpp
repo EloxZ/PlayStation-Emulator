@@ -32,7 +32,8 @@ void testFetching() {
 
     try {
         BIOS bios(biosPath);
-        Interconnect inter(bios);
+        RAM ram;
+        Interconnect inter(bios, ram);
         CPU cpu(inter);
 
         while (true) {

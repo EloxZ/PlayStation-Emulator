@@ -10,10 +10,18 @@
 #include <thread>
 #include <cstddef>
 #include <algorithm>
+#include <iostream>
 
 class CPU {
 	public:
 		CPU(Interconnect inter);
+
+		enum Exception {
+			SYS_CALL = 0x8,
+			OVER_FLOW = 0xc,
+			LOAD_ADDRESS_ERROR = 0x4,
+			STORE_ADDRESS_ERROR = 0x5,
+		};
 
 		void start();
 		void reset();
@@ -27,12 +35,17 @@ class CPU {
 		std::tuple<uint32_t, uint32_t> load = std::make_tuple(0, 0);
 		Interconnect inter;
 		uint32_t PC = Constants::BIOS_ADDRESS;
+		uint32_t currentPC = PC; // In case of exception
+		uint32_t nextPC = PC + 4;
+		uint32_t cause = 0;
+		uint32_t EPC = 0;
 		uint32_t SR = 0;
 		uint32_t HI = 0;
 		uint32_t LO = 0;
+		bool branchOccured = false;
+		bool delaySlot = false;
 		float clockFreq = Constants::DEFAULT_CLOCK_FREQ;
 		std::chrono::duration<float, std::milli> periodDuration = std::chrono::duration<float, std::milli>(1000/clockFreq);
-		Instruction nextInstruction = Instruction(0);
 
 		uint32_t getReg(uint32_t index) const;
 		void setReg(uint32_t index, uint32_t value);
@@ -43,6 +56,10 @@ class CPU {
 		void store32(uint32_t address, uint32_t value);
 		void store16(uint32_t address, uint16_t value);
 		void store8(uint32_t address, uint8_t value);
+
+		void exception(Exception exception);
+		void op_syscall(Instruction instruction);
+		void op_rfe(Instruction instruction);
 
 		void op_lui(Instruction instruction);
 		void op_ori(Instruction instruction);
@@ -56,18 +73,26 @@ class CPU {
 		void op_lb(Instruction instruction);
 		void op_lbu(Instruction instruction);
 		void op_sll(Instruction instruction);
+		void op_slt(Instruction instruction);
 		void op_sltu(Instruction instruction);
 		void op_slti(Instruction instruction);
+		void op_sltiu(Instruction instruction);
 		void op_add(Instruction instruction);
 		void op_addiu(Instruction instruction);
 		void op_addi(Instruction instruction);
 		void op_addu(Instruction instruction);
 		void op_subu(Instruction instruction);
 		void op_sra(Instruction instruction);
+		void op_srl(Instruction instruction);
 		void op_j(Instruction instruction);
 		void op_jal(Instruction instruction);
 		void op_jalr(Instruction instruction);
 		void op_jr(Instruction instruction);
+		void op_div(Instruction instruction);
+		void op_mflo(Instruction instruction);
+		void op_mfhi(Instruction instruction);
+		void op_mtlo(Instruction instruction);
+		void op_mthi(Instruction instruction);
 
 		void branch(uint32_t offset);
 		void op_bne(Instruction instruction);

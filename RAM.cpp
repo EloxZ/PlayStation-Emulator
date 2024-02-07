@@ -34,6 +34,16 @@ void RAM::store32(uint32_t offset, uint32_t value) {
 	data[offsetAsSize + 4] = b3;
 }
 
+void RAM::store16(uint32_t offset, uint16_t value) {
+	size_t offsetAsSize = static_cast<size_t>(offset);
+
+	uint8_t b0 = static_cast<uint8_t>(value);
+	uint8_t b1 = static_cast<uint8_t>(value >> 8);
+
+	data[offsetAsSize + 0] = b0;
+	data[offsetAsSize + 1] = b1;
+}
+
 void RAM::store8(uint32_t offset, uint8_t value) {
 	data[static_cast<size_t>(offset)] = value;
 }
