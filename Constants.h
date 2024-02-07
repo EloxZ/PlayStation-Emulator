@@ -39,6 +39,12 @@ class Constants {
 		const static uint32_t TIMERS_ADDRESS = 0x1f801104;
 		const static size_t TIMERS_SIZE = 0x30;
 
+		const static uint32_t DMA_ADDRESS = 0x1f801080;
+		const static size_t DMA_SIZE = 0x80;
+
+		const static uint32_t GPU_ADDRESS = 0x1f801080;
+		const static size_t GPU_SIZE = 0x80;
+
 		const static Range BIOS_RANGE;
 		const static Range SYS_CONTROL_RANGE;
 		const static Range RAM_CONFIG_REG_RANGE;
@@ -49,6 +55,8 @@ class Constants {
 		const static Range EXPANSION2_RANGE;
 		const static Range IRQ_CONTROL_RANGE;
 		const static Range TIMERS_RANGE;
+		const static Range DMA_RANGE;
+		const static Range GPU_RANGE;
 
 };
 

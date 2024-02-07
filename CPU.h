@@ -21,6 +21,8 @@ class CPU {
 			OVER_FLOW = 0xc,
 			LOAD_ADDRESS_ERROR = 0x4,
 			STORE_ADDRESS_ERROR = 0x5,
+			BREAK = 0x9,
+			COPROCESSOR_ERROR = 0xb
 		};
 
 		void start();
@@ -51,28 +53,38 @@ class CPU {
 		void setReg(uint32_t index, uint32_t value);
 
 		void executeInstruction(Instruction instruction);
+
 		uint32_t load32(uint32_t address) const;
+		uint16_t load16(uint32_t address) const;
 		uint8_t load8(uint32_t address) const;
+
 		void store32(uint32_t address, uint32_t value);
 		void store16(uint32_t address, uint16_t value);
 		void store8(uint32_t address, uint8_t value);
 
 		void exception(Exception exception);
 		void op_syscall(Instruction instruction);
+		void op_break(Instruction instruction);
 		void op_rfe(Instruction instruction);
 
 		void op_lui(Instruction instruction);
 		void op_ori(Instruction instruction);
 		void op_or(Instruction instruction);
+		void op_xori(Instruction instruction);
+		void op_xor(Instruction instruction);
+		void op_nor(Instruction instruction);
 		void op_andi(Instruction instruction);
 		void op_and(Instruction instruction);
 		void op_sw(Instruction instruction);
 		void op_sh(Instruction instruction);
 		void op_sb(Instruction instruction);
 		void op_lw(Instruction instruction);
+		void op_lh(Instruction instruction);
+		void op_lhu(Instruction instruction);
 		void op_lb(Instruction instruction);
 		void op_lbu(Instruction instruction);
 		void op_sll(Instruction instruction);
+		void op_sllv(Instruction instruction);
 		void op_slt(Instruction instruction);
 		void op_sltu(Instruction instruction);
 		void op_slti(Instruction instruction);
@@ -81,14 +93,19 @@ class CPU {
 		void op_addiu(Instruction instruction);
 		void op_addi(Instruction instruction);
 		void op_addu(Instruction instruction);
+		void op_sub(Instruction instruction);
 		void op_subu(Instruction instruction);
 		void op_sra(Instruction instruction);
+		void op_srav(Instruction instruction);
 		void op_srl(Instruction instruction);
+		void op_srlv(Instruction instruction);
 		void op_j(Instruction instruction);
 		void op_jal(Instruction instruction);
 		void op_jalr(Instruction instruction);
 		void op_jr(Instruction instruction);
 		void op_div(Instruction instruction);
+		void op_mult(Instruction instruction);
+		void op_multu(Instruction instruction);
 		void op_mflo(Instruction instruction);
 		void op_mfhi(Instruction instruction);
 		void op_mtlo(Instruction instruction);
@@ -104,5 +121,9 @@ class CPU {
 		void op_cop0(Instruction instruction);
 		void op_mtc0(Instruction instruction);
 		void op_mfc0(Instruction instruction);
+		
+		void op_cop1(Instruction instruction); // not supported
+		void op_cop2(Instruction instruction);
+		void op_cop3(Instruction instruction); // not supported
 };
 

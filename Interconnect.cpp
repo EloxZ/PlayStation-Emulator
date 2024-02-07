@@ -23,8 +23,50 @@ uint32_t Interconnect::load32(uint32_t address) const {
 		return 0;
 	}
 
+	offset = Constants::DMA_RANGE.contains(absAddress);
+
+	if (offset.has_value()) {
+		// DMA read
+		return 0;
+	}
+
+	offset = Constants::GPU_RANGE.contains(absAddress);
+
+	if (offset.has_value()) {
+		switch (offset.value()) {
+			case 4:
+				return 0x10000000;
+			default:
+				return 0;
+		}
+	}
 
 	throw std::runtime_error("Error at Interconnect::load32 with address: " + Utils::wordToString(address));
+}
+
+uint16_t Interconnect::load16(uint32_t address) const {
+	uint32_t absAddress = Utils::maskRegion(address);
+	std::optional<uint32_t> offset = Constants::SPU_RANGE.contains(absAddress);
+
+	if (offset.has_value()) {
+		// Unhandled read from SPU register
+		return 0;
+	}
+
+	offset = Constants::RAM_RANGE.contains(absAddress);
+
+	if (offset.has_value()) {
+		return ram.load16(offset.value());
+	}
+
+	offset = Constants::IRQ_CONTROL_RANGE.contains(absAddress);
+
+	if (offset.has_value()) {
+		// IRQ control read
+		return 0;
+	}
+
+	throw std::runtime_error("Error at Interconnect::load16 with address: " + Utils::wordToString(address));
 }
 
 uint8_t Interconnect::load8(uint32_t address) const {
@@ -87,6 +129,27 @@ void Interconnect::store32(uint32_t address, uint32_t value) {
 		return;
 	}
 
+	offset = Constants::DMA_RANGE.contains(absAddress);
+
+	if (offset.has_value()) {
+		// DMA write
+		return;
+	}
+
+	offset = Constants::GPU_RANGE.contains(absAddress);
+
+	if (offset.has_value()) {
+		// GPU write
+		return;
+	}
+
+	offset = Constants::TIMERS_RANGE.contains(absAddress);
+
+	if (offset.has_value()) {
+		// Timers write
+		return;
+	}
+
 	throw std::runtime_error("Error at Interconnect::store32 with address: " + Utils::wordToString(address));
 }
 
@@ -114,6 +177,13 @@ void Interconnect::store16(uint32_t address, uint16_t value) {
 
 	if (offset.has_value()) {
 		ram.store16(offset.value(), value);
+		return;
+	}
+
+	offset = Constants::IRQ_CONTROL_RANGE.contains(absAddress);
+
+	if (offset.has_value()) {
+		// Unhandled write to IRQ
 		return;
 	}
 

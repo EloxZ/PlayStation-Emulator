@@ -86,13 +86,19 @@ void CPU::executeInstruction(Instruction instruction) {
 	}
 }
 
+
 uint32_t CPU::load32(uint32_t address) const {
 	return inter.load32(address);
+}
+
+uint16_t CPU::load16(uint32_t address) const {
+	return inter.load16(address);
 }
 
 uint8_t CPU::load8(uint32_t address) const {
 	return inter.load8(address);
 }
+
 
 void CPU::store32(uint32_t address, uint32_t value) {
 	inter.store32(address, value);
@@ -128,6 +134,10 @@ void CPU::exception(Exception exception) {
 
 void CPU::op_syscall(Instruction instruction) {
 	exception(Exception::SYS_CALL);
+}
+
+void CPU::op_break(Instruction instruction) {
+	exception(Exception::BREAK);
 }
 
 void CPU::op_rfe(Instruction instruction) {
@@ -167,6 +177,36 @@ void CPU::op_or(Instruction instruction) {
 	uint32_t s = instruction.s();
 
 	uint32_t v = getReg(s) | getReg(t);
+
+	setReg(d, v);
+}
+
+void CPU::op_xori(Instruction instruction) {
+	uint32_t imm = instruction.imm();
+	uint32_t t = instruction.t();
+	uint32_t s = instruction.s();
+
+	uint32_t v = getReg(s) ^ imm;
+
+	setReg(t, v);
+}
+
+void CPU::op_xor(Instruction instruction) {
+	uint32_t d = instruction.d();
+	uint32_t t = instruction.t();
+	uint32_t s = instruction.s();
+
+	uint32_t v = getReg(s) ^ getReg(t);
+
+	setReg(d, v);
+}
+
+void CPU::op_nor(Instruction instruction) {
+	uint32_t d = instruction.d();
+	uint32_t t = instruction.t();
+	uint32_t s = instruction.s();
+
+	uint32_t v = ~(getReg(s) | getReg(t));
 
 	setReg(d, v);
 }
@@ -267,6 +307,36 @@ void CPU::op_lw(Instruction instruction) {
 	}
 }
 
+void CPU::op_lh(Instruction instruction) {
+	uint32_t imm_se = instruction.imm_se();
+	uint32_t t = instruction.t();
+	uint32_t s = instruction.s();
+
+	uint32_t addr = getReg(s) + imm_se;
+
+	if (addr % 2 == 0) {
+		int16_t v = static_cast<int16_t>(load16(addr));
+		load = std::make_tuple(t, static_cast<uint32_t>(v));
+	} else {
+		exception(Exception::LOAD_ADDRESS_ERROR);
+	}
+}
+
+void CPU::op_lhu(Instruction instruction) {
+	uint32_t imm_se = instruction.imm_se();
+	uint32_t t = instruction.t();
+	uint32_t s = instruction.s();
+
+	uint32_t addr = getReg(s) + imm_se;
+
+	if (addr % 2 == 0) {
+		uint32_t v = load16(addr);
+		load = std::make_tuple(t, v);
+	} else {
+		exception(Exception::LOAD_ADDRESS_ERROR);
+	}
+}
+
 void CPU::op_lb(Instruction instruction) {
 	uint32_t imm_se = instruction.imm_se();
 	uint32_t t = instruction.t();
@@ -295,6 +365,16 @@ void CPU::op_lbu(Instruction instruction) {
 
 void CPU::op_sll(Instruction instruction) {
 	// NOP, do nothing.
+}
+
+void CPU::op_sllv(Instruction instruction) {
+	uint32_t d = instruction.d();
+	uint32_t t = instruction.t();
+	uint32_t s = instruction.s();
+
+	uint32_t v = getReg(t) << (getReg(s) & 0x1f);
+
+	setReg(d, v);
 }
 
 void CPU::op_slt(Instruction instruction) {
@@ -396,6 +476,22 @@ void CPU::op_addu(Instruction instruction) {
 	setReg(d, v);
 }
 
+void CPU::op_sub(Instruction instruction) {
+	uint32_t d = instruction.d();
+	uint32_t t = instruction.t();
+	uint32_t s = instruction.s();
+
+	uint32_t v;
+	uint32_t rt = static_cast<uint32_t>(-static_cast<int32_t>(getReg(t)));
+
+	if (Utils::addWithSignedOverflowCheck(getReg(s), getReg(t), v)) {
+		exception(Exception::OVER_FLOW);
+		return;
+	}
+
+	setReg(d, v);
+}
+
 void CPU::op_subu(Instruction instruction) {
 	uint32_t d = instruction.d();
 	uint32_t t = instruction.t();
@@ -416,12 +512,32 @@ void CPU::op_sra(Instruction instruction) {
 	setReg(d, v);
 }
 
+void CPU::op_srav(Instruction instruction) {
+	uint32_t t = instruction.t();
+	uint32_t d = instruction.d();
+	uint32_t s = instruction.s();
+
+	int32_t v = static_cast<int32_t>(getReg(t)) >> (getReg(s) & 0x1f);
+
+	setReg(d, static_cast<uint32_t>(v));
+}
+
 void CPU::op_srl(Instruction instruction) {
 	uint32_t shift = instruction.shift();
 	uint32_t t = instruction.t();
 	uint32_t d = instruction.d();
 
 	uint32_t v = getReg(t) >> shift;
+
+	setReg(d, v);
+}
+
+void CPU::op_srlv(Instruction instruction) {
+	uint32_t t = instruction.t();
+	uint32_t d = instruction.d();
+	uint32_t s = instruction.s();
+
+	uint32_t v = getReg(t) >> (getReg(s) & 0x1f);
 
 	setReg(d, v);
 }
@@ -476,6 +592,32 @@ void CPU::op_div(Instruction instruction) {
 		HI = static_cast<uint32_t>(n % d);
 		LO = static_cast<uint32_t>(n / d);
 	}
+}
+
+void CPU::op_mult(Instruction instruction) {
+	uint32_t s = instruction.s();
+	uint32_t t = instruction.t();
+
+	int64_t a = static_cast<int64_t>(getReg(s));
+	int64_t b = static_cast<int64_t>(getReg(t));
+
+	uint64_t v = static_cast<uint64_t>(a * b);
+
+	HI = static_cast<uint32_t>(v >> 32);
+	LO = static_cast<uint32_t>(v);
+}
+
+void CPU::op_multu(Instruction instruction) {
+	uint32_t s = instruction.s();
+	uint32_t t = instruction.t();
+
+	uint64_t a = static_cast<uint64_t>(getReg(s));
+	uint64_t b = static_cast<uint64_t>(getReg(t));
+
+	uint64_t v = a * b;
+
+	HI = static_cast<uint32_t>(v >> 32);
+	LO = static_cast<uint32_t>(v);
 }
 
 void CPU::op_mflo(Instruction instruction) {
@@ -638,4 +780,19 @@ void CPU::op_mfc0(Instruction instruction) {
 
 	load = std::make_tuple(cpu_r, v);
 }
+
+
+void CPU::op_cop1(Instruction instruction) {
+	exception(Exception::COPROCESSOR_ERROR);
+}
+
+void CPU::op_cop2(Instruction instruction) {
+	throw std::runtime_error("Unhandled GTE instruction: " + Utils::wordToString(instruction.getData()));
+
+}
+
+void CPU::op_cop3(Instruction instruction) {
+	exception(Exception::COPROCESSOR_ERROR);
+}
+
 

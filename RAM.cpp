@@ -15,6 +15,15 @@ uint32_t RAM::load32(uint32_t offset) const {
 	return b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
 }
 
+uint16_t RAM::load16(uint32_t offset) const {
+	size_t offsetAsSize = static_cast<size_t>(offset);
+
+	uint32_t b0 = static_cast<uint32_t>(data[offsetAsSize + 0]);
+	uint32_t b1 = static_cast<uint32_t>(data[offsetAsSize + 1]);
+
+	return b0 | (b1 << 8);
+}
+
 uint8_t RAM::load8(uint32_t offset) const {
 	return data[static_cast<size_t>(offset)];
 }
