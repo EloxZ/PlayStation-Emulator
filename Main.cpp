@@ -7,7 +7,7 @@
 #include <iomanip>
 
 int main() {
-    std::cout << "Play Station Emulator" << std::endl << std::endl;
+    std::cout << "PlayStation Emulator" << std::endl << std::endl;
 
     runTests();
 

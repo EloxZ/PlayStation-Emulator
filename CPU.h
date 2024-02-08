@@ -22,7 +22,8 @@ class CPU {
 			LOAD_ADDRESS_ERROR = 0x4,
 			STORE_ADDRESS_ERROR = 0x5,
 			BREAK = 0x9,
-			COPROCESSOR_ERROR = 0xb
+			COPROCESSOR_ERROR = 0xb,
+			ILLEGAL_INSTRUCTION = 0xa
 		};
 
 		void start();
@@ -65,6 +66,7 @@ class CPU {
 		void exception(Exception exception);
 		void op_syscall(Instruction instruction);
 		void op_break(Instruction instruction);
+		void op_illegal(Instruction instruction);
 		void op_rfe(Instruction instruction);
 
 		void op_lui(Instruction instruction);
@@ -76,9 +78,13 @@ class CPU {
 		void op_andi(Instruction instruction);
 		void op_and(Instruction instruction);
 		void op_sw(Instruction instruction);
+		void op_swl(Instruction instruction);
+		void op_swr(Instruction instruction);
 		void op_sh(Instruction instruction);
 		void op_sb(Instruction instruction);
 		void op_lw(Instruction instruction);
+		void op_lwl(Instruction instruction);
+		void op_lwr(Instruction instruction);
 		void op_lh(Instruction instruction);
 		void op_lhu(Instruction instruction);
 		void op_lb(Instruction instruction);
@@ -104,6 +110,7 @@ class CPU {
 		void op_jalr(Instruction instruction);
 		void op_jr(Instruction instruction);
 		void op_div(Instruction instruction);
+		void op_divu(Instruction instruction);
 		void op_mult(Instruction instruction);
 		void op_multu(Instruction instruction);
 		void op_mflo(Instruction instruction);
@@ -119,11 +126,21 @@ class CPU {
 		void op_bxx(Instruction instruction); // bgez bltz bgezal bltzal
 
 		void op_cop0(Instruction instruction);
+		void op_lwc0(Instruction instruction); // not supported
+		void op_swc0(Instruction instruction); // not supported
 		void op_mtc0(Instruction instruction);
 		void op_mfc0(Instruction instruction);
 		
 		void op_cop1(Instruction instruction); // not supported
+		void op_lwc1(Instruction instruction); // not supported
+		void op_swc1(Instruction instruction); // not supported
+
 		void op_cop2(Instruction instruction);
+		void op_lwc2(Instruction instruction);
+		void op_swc2(Instruction instruction);
+
 		void op_cop3(Instruction instruction); // not supported
+		void op_lwc3(Instruction instruction); // not supported
+		void op_swc3(Instruction instruction); // not supported
 };
 
