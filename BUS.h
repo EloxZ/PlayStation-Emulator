@@ -6,9 +6,11 @@
 #include "Constants.h"
 #include "Utils.h"
 
-class Interconnect {
+#include <iostream>
+
+class BUS {
 	public:
-		Interconnect(BIOS bios, RAM ram);
+		BUS(BIOS bios, RAM ram);
 
 		uint32_t load32(uint32_t address) const;
 		uint16_t load16(uint32_t address) const;

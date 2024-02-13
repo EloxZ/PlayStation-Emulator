@@ -1,6 +1,6 @@
 #include "CPU.h"
 
-CPU::CPU(Interconnect inter) : inter(inter) {
+CPU::CPU(BUS bus) : bus(bus) {
 	regs[0] = 0;
 }
 
@@ -37,9 +37,11 @@ void CPU::executeNextInstruction() {
 		return;
 	}
 
+	//std::cout << "PC=" << Utils::wordToString(PC) << std::endl;
+
 	Instruction instruction(load32(PC));
 
-	std::cout << "Fetching " << Utils::wordToString(instruction.getData()) << " with PC = " << Utils::wordToString(PC) << std::endl;
+	//std::cout << "Fetching " << Utils::wordToString(instruction.getData()) << std::endl;
 	
 	// Delay
 	delaySlot = branchOccured;
@@ -56,9 +58,51 @@ void CPU::executeNextInstruction() {
 
 	// regs = outRegs
 	std::copy(std::begin(outRegs), std::end(outRegs), std::begin(regs));
+
+	listenBIOSfunction();
+}
+
+void CPU::loadExecutable(std::string path) {
+	std::ifstream input(path, std::ios::binary);
+
+	if (input.fail()) {
+		input.close();
+		throw std::runtime_error("Error reading EXE file: " + path);
+	}
+
+	std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(input)), (std::istreambuf_iterator<char>()));
+	input.close();
+
+	bool isPSXexe = bytes[0] == 'P' && bytes[1] == 'S'
+		&& bytes[2] == '-' && bytes[3] == 'X'
+		&& bytes[4] == ' ' && bytes[5] == 'E'
+		&& bytes[6] == 'X' && bytes[7] == 'E';
+
+	if (!isPSXexe) {
+		throw std::runtime_error("Invalid EXE format: " + path);
+	}
+
+	uint32_t initialPC = Utils::getWordFromBytes(bytes, 0x10);
+	uint32_t initialGP = Utils::getWordFromBytes(bytes, 0x14);
+	uint32_t loadAddress = Utils::getWordFromBytes(bytes, 0x18);
+	uint32_t fileSize = Utils::getWordFromBytes(bytes, 0x1c);
+	uint32_t dataSectionStartAddress = Utils::getWordFromBytes(bytes, 0x28);
+	uint32_t dataSectionSize = Utils::getWordFromBytes(bytes, 0x2c);
+	uint32_t initialSPbase = Utils::getWordFromBytes(bytes, 0x30);
+	uint32_t intialSPoffset = Utils::getWordFromBytes(bytes, 0x34);
+	uint32_t dataAddress = 0x800;
+
+	for (unsigned int i = 0; i < fileSize; i++) {
+		bus.store8(loadAddress + i, bytes[dataAddress + i]);
+	}
+
+	PC = initialPC;
 }
 
 void CPU::executeInstruction(Instruction instruction) {
+	////std::cout << "Function " << Utils::wordToString(instruction.function()) << std::endl;
+	////std::cout << "Subfunction " << Utils::wordToString(instruction.subfunction()) << std::endl;
+
 	switch (instruction.function()) {
 		case 0b000000:
 			switch (instruction.subfunction()) {
@@ -274,32 +318,33 @@ void CPU::executeInstruction(Instruction instruction) {
 
 
 uint32_t CPU::load32(uint32_t address) const {
-	return inter.load32(address);
+	return bus.load32(address);
 }
 
 uint16_t CPU::load16(uint32_t address) const {
-	return inter.load16(address);
+	return bus.load16(address);
 }
 
 uint8_t CPU::load8(uint32_t address) const {
-	return inter.load8(address);
+	return bus.load8(address);
 }
 
 
 void CPU::store32(uint32_t address, uint32_t value) {
-	inter.store32(address, value);
+	bus.store32(address, value);
 }
 
 void CPU::store16(uint32_t address, uint16_t value) {
-	inter.store16(address, value);
+	bus.store16(address, value);
 }
 
 void CPU::store8(uint32_t address, uint8_t value) {
-	inter.store8(address, value);
+	bus.store8(address, value);
 }
 
 
 void CPU::exception(Exception exception) {
+	//std::cout << "Exception " << exception << std::endl;
 	uint32_t handler = (SR & (1 << 22))? 0xbfc00180 : 0x80000080;
 	uint32_t mode = SR & 0x3f;
 
@@ -319,17 +364,17 @@ void CPU::exception(Exception exception) {
 }
 
 void CPU::op_syscall(Instruction instruction) {
-	std::cout << "SYS_CALL exception " << Utils::wordToString(instruction.getData()) << std::endl;
+	//std::cout << "SYS_CALL exception " << Utils::wordToString(instruction.getData()) << std::endl;
 	exception(Exception::SYS_CALL);
 }
 
 void CPU::op_break(Instruction instruction) {
-	std::cout << "BREAK exception " << Utils::wordToString(instruction.getData()) << std::endl;
+	//std::cout << "BREAK exception " << Utils::wordToString(instruction.getData()) << std::endl;
 	exception(Exception::BREAK);
 }
 
 void CPU::op_illegal(Instruction instruction) {
-	std::cout << "Illegal instruction " << Utils::wordToString(instruction.getData()) << std::endl;
+	//std::cout << "Illegal instruction " << Utils::wordToString(instruction.getData()) << std::endl;
 	exception(Exception::ILLEGAL_INSTRUCTION);
 }
 
@@ -341,6 +386,8 @@ void CPU::op_rfe(Instruction instruction) {
 	uint32_t mode = SR & 0x3f;
 	SR &= ~0x3f;
 	SR |= mode >> 2;
+
+	//std::cout << "op_rfe" << std::endl;
 }
 
 
@@ -352,6 +399,7 @@ void CPU::op_lui(Instruction instruction) {
 	uint32_t v = imm << 16;
 
 	setReg(t, v);
+	//std::cout << "op_lui setReg(" << Utils::wordToString(t) << ", " << Utils::wordToString(v) << ")" << std::endl;
 }
 
 void CPU::op_ori(Instruction instruction) {
@@ -362,6 +410,7 @@ void CPU::op_ori(Instruction instruction) {
 	uint32_t v = getReg(s) | imm;
 
 	setReg(t, v);
+	//std::cout << "op_ori setReg(" << Utils::wordToString(t) << ", " << Utils::wordToString(v) << ")" << std::endl;
 }
 
 void CPU::op_or(Instruction instruction) {
@@ -372,6 +421,7 @@ void CPU::op_or(Instruction instruction) {
 	uint32_t v = getReg(s) | getReg(t);
 
 	setReg(d, v);
+	//std::cout << "op_or setReg(" << Utils::wordToString(d) << ", " << Utils::wordToString(v) << ")" << std::endl;
 }
 
 void CPU::op_xori(Instruction instruction) {
@@ -382,6 +432,7 @@ void CPU::op_xori(Instruction instruction) {
 	uint32_t v = getReg(s) ^ imm;
 
 	setReg(t, v);
+	//std::cout << "op_xori setReg(" << Utils::wordToString(t) << ", " << Utils::wordToString(v) << ")" << std::endl;
 }
 
 void CPU::op_xor(Instruction instruction) {
@@ -392,6 +443,7 @@ void CPU::op_xor(Instruction instruction) {
 	uint32_t v = getReg(s) ^ getReg(t);
 
 	setReg(d, v);
+	//std::cout << "op_xor setReg(" << Utils::wordToString(d) << ", " << Utils::wordToString(v) << ")" << std::endl;
 }
 
 void CPU::op_nor(Instruction instruction) {
@@ -402,6 +454,7 @@ void CPU::op_nor(Instruction instruction) {
 	uint32_t v = ~(getReg(s) | getReg(t));
 
 	setReg(d, v);
+	//std::cout << "op_nor setReg(" << Utils::wordToString(d) << ", " << Utils::wordToString(v) << ")" << std::endl;
 }
 
 void CPU::op_andi(Instruction instruction) {
@@ -422,6 +475,7 @@ void CPU::op_and(Instruction instruction) {
 	uint32_t v = getReg(s) & getReg(t);
 
 	setReg(d, v);
+	//std::cout << "op_and setReg(" << Utils::wordToString(d) << ", " << Utils::wordToString(v) << ")" << std::endl;
 }
 
 void CPU::op_sw(Instruction instruction) {
@@ -439,6 +493,8 @@ void CPU::op_sw(Instruction instruction) {
 	if (addr % 4 == 0) {
 		uint32_t v = getReg(t);
 		store32(addr, v);
+
+		//std::cout << "op_sw store32(" << Utils::wordToString(addr) << ", " << Utils::wordToString(v) << ")" << std::endl;
 	} else {
 		exception(Exception::STORE_ADDRESS_ERROR);
 	}
@@ -475,6 +531,7 @@ void CPU::op_swl(Instruction instruction) {
 	}
 
 	store32(addr, mem);
+	//std::cout << "op_swl store32(" << Utils::wordToString(addr) << ", " << Utils::wordToString(mem) << ")" << std::endl;
 }
 
 void CPU::op_swr(Instruction instruction) {
@@ -508,6 +565,7 @@ void CPU::op_swr(Instruction instruction) {
 	}
 
 	store32(addr, mem);
+	//std::cout << "op_swr store32(" << Utils::wordToString(addr) << ", " << Utils::wordToString(mem) << ")" << std::endl;
 }
 
 void CPU::op_sh(Instruction instruction) {
@@ -525,6 +583,8 @@ void CPU::op_sh(Instruction instruction) {
 	if (addr % 2 == 0) {
 		uint32_t v = getReg(t);
 		store16(addr, static_cast<uint16_t>(v));
+
+		//std::cout << "op_sh store16(" << Utils::wordToString(addr) << ", " << Utils::wordToString(v) << ")" << std::endl;
 	} else {
 		exception(Exception::STORE_ADDRESS_ERROR);
 	}
@@ -544,6 +604,7 @@ void CPU::op_sb(Instruction instruction) {
 	uint32_t v = getReg(t);
 
 	store8(addr, static_cast<uint8_t>(v));
+	//std::cout << "op_sb store8(" << Utils::wordToString(addr) << ", " << Utils::wordToString(v) << ")" << std::endl;
 }
 
 void CPU::op_lw(Instruction instruction) {
@@ -561,6 +622,8 @@ void CPU::op_lw(Instruction instruction) {
 	if (addr % 4 == 0) {
 		uint32_t v = load32(addr);
 		load = std::make_tuple(t, v);
+
+		//std::cout << "op_lw load=(" << Utils::wordToString(t) << ", " << Utils::wordToString(v) << ")" << std::endl;
 	} else {
 		exception(Exception::LOAD_ADDRESS_ERROR);
 	}
@@ -597,6 +660,7 @@ void CPU::op_lwl(Instruction instruction) {
 	}
 
 	load = std::make_tuple(t, v);
+	//std::cout << "op_lwl load=(" << Utils::wordToString(t) << ", " << Utils::wordToString(v) << ")" << std::endl;
 }
 
 void CPU::op_lwr(Instruction instruction) {
@@ -630,6 +694,7 @@ void CPU::op_lwr(Instruction instruction) {
 	}
 
 	load = std::make_tuple(t, v);
+	//std::cout << "op_lwr load=(" << Utils::wordToString(t) << ", " << Utils::wordToString(v) << ")" << std::endl;
 }
 
 void CPU::op_lh(Instruction instruction) {
@@ -642,6 +707,8 @@ void CPU::op_lh(Instruction instruction) {
 	if (addr % 2 == 0) {
 		int16_t v = static_cast<int16_t>(load16(addr));
 		load = std::make_tuple(t, static_cast<uint32_t>(v));
+
+		//std::cout << "op_lh load=(" << Utils::wordToString(t) << ", " << Utils::wordToString(static_cast<uint32_t>(v)) << ")" << std::endl;
 	} else {
 		exception(Exception::LOAD_ADDRESS_ERROR);
 	}
@@ -657,6 +724,8 @@ void CPU::op_lhu(Instruction instruction) {
 	if (addr % 2 == 0) {
 		uint32_t v = load16(addr);
 		load = std::make_tuple(t, v);
+
+		//std::cout << "op_lhu load=(" << Utils::wordToString(t) << ", " << Utils::wordToString(v) << ")" << std::endl;
 	} else {
 		exception(Exception::LOAD_ADDRESS_ERROR);
 	}
@@ -675,6 +744,7 @@ void CPU::op_lb(Instruction instruction) {
 	}
 
 	load = std::make_tuple(t, v);
+	//std::cout << "op_lb load=(" << Utils::wordToString(t) << ", " << Utils::wordToString(v) << ")" << std::endl;
 }
 
 void CPU::op_lbu(Instruction instruction) {
@@ -686,10 +756,11 @@ void CPU::op_lbu(Instruction instruction) {
 	uint32_t v = load8(addr);
 
 	load = std::make_tuple(t, v);
+	//std::cout << "op_lbu load=(" << Utils::wordToString(t) << ", " << Utils::wordToString(v) << ")" << std::endl;
 }
 
 void CPU::op_sll(Instruction instruction) {
-	// NOP, do nothing.
+	//std::cout << "op_sll" << std::endl;
 }
 
 void CPU::op_sllv(Instruction instruction) {
@@ -700,6 +771,7 @@ void CPU::op_sllv(Instruction instruction) {
 	uint32_t v = getReg(t) << (getReg(s) & 0x1f);
 
 	setReg(d, v);
+	//std::cout << "op_sllv setReg(" << Utils::wordToString(d) << ", " << Utils::wordToString(v) << ")" << std::endl;
 }
 
 void CPU::op_slt(Instruction instruction) {
@@ -713,6 +785,7 @@ void CPU::op_slt(Instruction instruction) {
 	uint32_t v = ss < st;
 
 	setReg(d, v);
+	//std::cout << "op_slt setReg(" << Utils::wordToString(d) << ", " << Utils::wordToString(v) << ")" << std::endl;
 }
 
 void CPU::op_sltu(Instruction instruction) {
@@ -723,6 +796,7 @@ void CPU::op_sltu(Instruction instruction) {
 	uint32_t v = getReg(s) < getReg(t);
 
 	setReg(d, v);
+	//std::cout << "op_sltu setReg(" << Utils::wordToString(d) << ", " << Utils::wordToString(v) << ")" << std::endl;
 }
 
 void CPU::op_slti(Instruction instruction) {
@@ -736,6 +810,7 @@ void CPU::op_slti(Instruction instruction) {
 	uint32_t v = ss < si;
 
 	setReg(t, v);
+	//std::cout << "op_slti setReg(" << Utils::wordToString(t) << ", " << Utils::wordToString(v) << ")" << std::endl;
 }
 
 void CPU::op_sltiu(Instruction instruction) {
@@ -746,6 +821,7 @@ void CPU::op_sltiu(Instruction instruction) {
 	uint32_t v = getReg(s) < imm_se;
 
 	setReg(t, v);
+	//std::cout << "op_sltiu setReg(" << Utils::wordToString(t) << ", " << Utils::wordToString(v) << ")" << std::endl;
 }
 
 void CPU::op_add(Instruction instruction) {
@@ -761,6 +837,7 @@ void CPU::op_add(Instruction instruction) {
 	}
 
 	setReg(d, v);
+	//std::cout << "op_add setReg(" << Utils::wordToString(d) << ", " << Utils::wordToString(v) << ")" << std::endl;
 }
 
 void CPU::op_addiu(Instruction instruction) {
@@ -771,6 +848,7 @@ void CPU::op_addiu(Instruction instruction) {
 	uint32_t v = getReg(s) + imm_se;
 
 	setReg(t, v);
+	//std::cout << "op_addiu setReg(" << Utils::wordToString(t) << ", " << Utils::wordToString(v) << ")" << std::endl;
 }
 
 void CPU::op_addi(Instruction instruction) {
@@ -786,6 +864,7 @@ void CPU::op_addi(Instruction instruction) {
 	}
 
 	setReg(t, v);
+	//std::cout << "op_addi setReg(" << Utils::wordToString(t) << ", " << Utils::wordToString(v) << ")" << std::endl;
 }
 
 void CPU::op_addu(Instruction instruction) {
@@ -796,6 +875,7 @@ void CPU::op_addu(Instruction instruction) {
 	uint32_t v = getReg(s) + getReg(t);
 
 	setReg(d, v);
+	//std::cout << "op_addu setReg(" << Utils::wordToString(d) << ", " << Utils::wordToString(v) << ")" << std::endl;
 }
 
 void CPU::op_sub(Instruction instruction) {
@@ -812,6 +892,7 @@ void CPU::op_sub(Instruction instruction) {
 	}
 
 	setReg(d, v);
+	//std::cout << "op_sub setReg(" << Utils::wordToString(d) << ", " << Utils::wordToString(v) << ")" << std::endl;
 }
 
 void CPU::op_subu(Instruction instruction) {
@@ -822,6 +903,7 @@ void CPU::op_subu(Instruction instruction) {
 	uint32_t v = getReg(s) - getReg(t);
 
 	setReg(d, v);
+	//std::cout << "op_subu setReg(" << Utils::wordToString(d) << ", " << Utils::wordToString(v) << ")" << std::endl;
 }
 
 void CPU::op_sra(Instruction instruction) {
@@ -832,6 +914,7 @@ void CPU::op_sra(Instruction instruction) {
 	uint32_t v = Utils::signedRightShift(getReg(t), shift);
 
 	setReg(d, v);
+	//std::cout << "op_sra setReg(" << Utils::wordToString(d) << ", " << Utils::wordToString(v) << ")" << std::endl;
 }
 
 void CPU::op_srav(Instruction instruction) {
@@ -842,6 +925,7 @@ void CPU::op_srav(Instruction instruction) {
 	int32_t v = static_cast<int32_t>(getReg(t)) >> (getReg(s) & 0x1f);
 
 	setReg(d, static_cast<uint32_t>(v));
+	//std::cout << "op_srav setReg(" << Utils::wordToString(d) << ", " << Utils::wordToString(static_cast<uint32_t>(v)) << ")" << std::endl;
 }
 
 void CPU::op_srl(Instruction instruction) {
@@ -852,6 +936,7 @@ void CPU::op_srl(Instruction instruction) {
 	uint32_t v = getReg(t) >> shift;
 
 	setReg(d, v);
+	//std::cout << "op_srl setReg(" << Utils::wordToString(d) << ", " << Utils::wordToString(v) << ")" << std::endl;
 }
 
 void CPU::op_srlv(Instruction instruction) {
@@ -862,17 +947,21 @@ void CPU::op_srlv(Instruction instruction) {
 	uint32_t v = getReg(t) >> (getReg(s) & 0x1f);
 
 	setReg(d, v);
+	//std::cout << "op_srlv setReg(" << Utils::wordToString(d) << ", " << Utils::wordToString(v) << ")" << std::endl;
 }
 
 void CPU::op_j(Instruction instruction) {
 	uint32_t imm_jump = instruction.imm_jump();
 	nextPC = (nextPC & 0xf0000000) | (imm_jump << 2);
+
+	//std::cout << "op_j nextPC=" << Utils::wordToString(nextPC) << std::endl;
 }
 
 void CPU::op_jal(Instruction instruction) {
 	uint32_t ra = nextPC;
 	
 	setReg(31, ra);
+	//std::cout << "op_jal setReg(" << Utils::wordToString(31) << ", " << Utils::wordToString(ra) << ")" << std::endl;
 	
 	op_j(instruction);
 }
@@ -883,13 +972,17 @@ void CPU::op_jalr(Instruction instruction) {
 	uint32_t ra = nextPC;
 
 	setReg(d, ra);
+	//std::cout << "op_jalr setReg(" << Utils::wordToString(d) << ", " << Utils::wordToString(ra) << ")" << std::endl;
 
 	nextPC = getReg(s);
+	//std::cout << "op_jalr nextPC=" << Utils::wordToString(nextPC) << std::endl;
 }
 
 void CPU::op_jr(Instruction instruction) {
 	uint32_t s = instruction.s();
 	nextPC = getReg(s);
+
+	//std::cout << "op_jr nextPC=" << Utils::wordToString(nextPC) << std::endl;
 }
 
 void CPU::op_div(Instruction instruction) {
@@ -914,6 +1007,8 @@ void CPU::op_div(Instruction instruction) {
 		HI = static_cast<uint32_t>(n % d);
 		LO = static_cast<uint32_t>(n / d);
 	}
+
+	//std::cout << "op_div (HI=" << Utils::wordToString(HI) << ", LO=" << Utils::wordToString(LO) << ")" << std::endl;
 }
 
 void CPU::op_divu(Instruction instruction) {
@@ -930,6 +1025,8 @@ void CPU::op_divu(Instruction instruction) {
 		HI = n % d;
 		LO = n / d;
 	}
+
+	//std::cout << "op_divu (HI=" << Utils::wordToString(HI) << ", LO=" << Utils::wordToString(LO) << ")" << std::endl;
 }
 
 void CPU::op_mult(Instruction instruction) {
@@ -943,6 +1040,8 @@ void CPU::op_mult(Instruction instruction) {
 
 	HI = static_cast<uint32_t>(v >> 32);
 	LO = static_cast<uint32_t>(v);
+
+	//std::cout << "op_mult (HI=" << Utils::wordToString(HI) << ", LO=" << Utils::wordToString(LO) << ")" << std::endl;
 }
 
 void CPU::op_multu(Instruction instruction) {
@@ -956,26 +1055,36 @@ void CPU::op_multu(Instruction instruction) {
 
 	HI = static_cast<uint32_t>(v >> 32);
 	LO = static_cast<uint32_t>(v);
+
+	//std::cout << "op_multu (HI=" << Utils::wordToString(HI) << ", LO=" << Utils::wordToString(LO) << ")" << std::endl;
 }
 
 void CPU::op_mflo(Instruction instruction) {
 	uint32_t d = instruction.d();
 	setReg(d, LO);
+
+	//std::cout << "op_mflo setReg(" << Utils::wordToString(d) << ", " << Utils::wordToString(LO) << ")" << std::endl;
 }
 
 void CPU::op_mfhi(Instruction instruction) {
 	uint32_t d = instruction.d();
 	setReg(d, HI);
+
+	//std::cout << "op_mfhi setReg(" << Utils::wordToString(d) << ", " << Utils::wordToString(HI) << ")" << std::endl;
 }
 
 void CPU::op_mtlo(Instruction instruction) {
 	uint32_t s = instruction.s();
 	LO = getReg(s);
+
+	//std::cout << "op_mtlo LO=" << Utils::wordToString(LO) << std::endl;
 }
 
 void CPU::op_mthi(Instruction instruction) {
 	uint32_t s = instruction.s();
 	HI = getReg(s);
+
+	//std::cout << "op_mtlo LO=" << Utils::wordToString(HI) << std::endl;
 }
 
 
@@ -987,12 +1096,16 @@ void CPU::branch(uint32_t offset) {
 
 	branchOccured = true;
 	nextPC = calculatedPC;
+
+	//std::cout << "Branch to PC=" << Utils::wordToString(nextPC) << std::endl;
 }
 
 void CPU::op_bne(Instruction instruction) {
 	uint32_t imm_se = instruction.imm_se();
 	uint32_t t = instruction.t();
 	uint32_t s = instruction.s();
+
+	//std::cout << "op_bne" << std::endl;
 
 	if (getReg(s) != getReg(t)) {
 		branch(imm_se);
@@ -1003,6 +1116,8 @@ void CPU::op_beq(Instruction instruction) {
 	uint32_t imm_se = instruction.imm_se();
 	uint32_t t = instruction.t();
 	uint32_t s = instruction.s();
+
+	//std::cout << "op_beq" << std::endl;
 
 	if (getReg(s) == getReg(t)) {
 		branch(imm_se);
@@ -1015,6 +1130,8 @@ void CPU::op_bgtz(Instruction instruction) {
 
 	uint32_t v = getReg(s);
 
+	//std::cout << "op_bgtz" << std::endl;
+
 	if (!Utils::isSignedNegative(v) && v != 0) {
 		branch(imm_se);
 	}
@@ -1025,6 +1142,8 @@ void CPU::op_blez(Instruction instruction) {
 	uint32_t s = instruction.s();
 
 	uint32_t v = getReg(s);
+
+	//std::cout << "op_blez" << std::endl;
 
 	if (Utils::isSignedNegative(v) || v == 0) {
 		branch(imm_se);
@@ -1044,6 +1163,8 @@ void CPU::op_bxx(Instruction instruction) {
 	bool test = Utils::isSignedNegative(v);
 	test ^= isBgez;
 
+	//std::cout << "op_bxx" << std::endl;
+
 	if (test) {
 		if (isLink) {
 			uint32_t ra = nextPC;
@@ -1056,6 +1177,8 @@ void CPU::op_bxx(Instruction instruction) {
 
 
 void CPU::op_cop0(Instruction instruction) {
+	//std::cout << "op_cop0" << std::endl;
+
 	switch (instruction.s()) {
 		case 0b00000:
 			op_mfc0(instruction);
@@ -1084,6 +1207,8 @@ void CPU::op_mtc0(Instruction instruction) {
 	uint32_t cop_r = instruction.d();
 
 	uint32_t v = getReg(cpu_r);
+
+	//std::cout << "op_mtc0" << std::endl;
 
 	switch (cop_r) {
 		case 3: case 5: case 6: case 7: case 9: case 11:
@@ -1125,6 +1250,7 @@ void CPU::op_mfc0(Instruction instruction) {
 	}
 
 	load = std::make_tuple(cpu_r, v);
+	//std::cout << "op_mfc0 load=(" << Utils::wordToString(cpu_r) << ", " << Utils::wordToString(v) << ")" << std::endl;
 }
 
 
@@ -1165,6 +1291,50 @@ void CPU::op_lwc3(Instruction instruction) {
 void CPU::op_swc3(Instruction instruction) {
 	exception(Exception::COPROCESSOR_ERROR);
 }
+
+
+void CPU::listenBIOSfunction() const {
+	if (PC == 0xA0) { // A-Function
+		//std::cout << "A-Function" << std::endl;
+		switch (getReg(9)) {
+			case 0x3c:
+				putchar(static_cast<char>(getReg(4)));
+				break;
+			case 0x3e:
+				puts();
+				break;
+			default:
+				break;
+		}
+	} else if (PC == 0xB0) { // B-Function
+		//std::cout << "B-Function" << std::endl;
+		switch (getReg(9)) {
+			case 0x3d:
+				putchar(static_cast<char>(getReg(4)));
+				break;
+			case 0x3f:
+				puts();
+				break;
+			default:
+				break;
+		}
+	}
+}
+
+void CPU::puts() const {
+	uint32_t src = getReg(4);
+	char c = static_cast<char>(bus.load8(src++));
+
+	while (c) {
+		putchar(c);
+		c = static_cast<char>(bus.load8(src++));
+	}
+}
+
+void CPU::putchar(char c) const {
+	std::cout << c;
+}
+
 
 
 

@@ -20,5 +20,7 @@ class BIOS {
 	
 	private:
 		std::vector<uint8_t> data;
+
+		
 };
 

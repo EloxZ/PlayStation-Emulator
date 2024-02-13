@@ -13,7 +13,7 @@ const uint32_t Utils::REGION_MASK[8] = {
 
 const std::string Utils::wordToString(uint32_t word) {
     std::stringstream wordStream;
-    wordStream << "0x" << std::hex << word;
+    wordStream << "0x" << std::hex << std::setfill('0') << std::setw(8) << word;
 
     return wordStream.str();
 }
@@ -47,4 +47,32 @@ const uint32_t Utils::signedRightShift(uint32_t value, uint32_t shift) {
     } else {
         return value >> shift;
     }
+}
+
+const void Utils::printBytes(const std::vector<uint8_t>& bytes) {
+    std::stringstream ss;
+    unsigned int i = 0;
+
+    for (const uint8_t& byte : bytes) {
+       ss << std::setfill('0') << std::setw(2) << std::hex << +byte;
+       i++;
+       if (i % 4 == 0) {
+           ss << std::endl;
+       }
+       if (i == 64) {
+           break;
+       }
+    }
+    
+    std::cout << ss.str() << std::endl;
+}
+
+const uint32_t Utils::getWordFromBytes(const std::vector<uint8_t>& bytes, uint32_t address) {
+    uint32_t word = 0;
+
+    for (unsigned int i = 0; i < 4; i++) {
+        word |= static_cast<uint32_t>(bytes[address + i]) << (8 * i);
+    }
+
+    return word;
 }

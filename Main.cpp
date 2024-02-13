@@ -1,3 +1,5 @@
+#pragma once
+
 #include "BIOS.h"
 #include "CPU.h"
 #include "Test.h"

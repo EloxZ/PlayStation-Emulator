@@ -2,11 +2,12 @@
 
 void runTests() {
     std::cout << "### Tests ###" << std::endl << std::endl;
-    testFetching();
+    //testReadBIOSFile();
+    testCPUoperations();
 }
 
-void testBIOS() {
-    std::cout << "# BIOS Test #" << std::endl;
+void testReadBIOSFile() {
+    std::cout << "# Read BIOS File Test #" << std::endl;
     const std::string biosPath = "./files/bios/scph5501.bin";
 
     try {
@@ -15,31 +16,50 @@ void testBIOS() {
 
         std::vector<uint8_t> biosData = bios.getData();
 
-        std::cout << "BIOS Data (First Address):" << std::endl;
-        for (size_t i = 0; i < 16; ++i) {
-            std::cout << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(biosData[i]) << " ";
-        }
-        std::cout << std::endl;
+        Utils::printBytes(biosData);
 
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
     }
 }
 
-void testFetching() {
-    std::cout << "# Fetching Test #" << std::endl;
+void testExecuteBIOS() {
+    std::cout << "# Execute BIOS Test #" << std::endl;
     const std::string biosPath = "./files/bios/scph5501.bin";
 
     try {
         BIOS bios(biosPath);
         RAM ram;
-        Interconnect inter(bios, ram);
-        CPU cpu(inter);
+        BUS bus(bios, ram);
+        CPU cpu(bus);
 
         while (true) {
             cpu.executeNextInstruction();
         }
         
+
+    } catch (const std::exception& e) {
+        std::cerr << e.what() << std::endl;
+    }
+}
+
+void testCPUoperations() {
+    std::cout << "# Test CPU operations #" << std::endl;
+    const std::string biosPath = "./files/bios/scph5501.bin";
+    const std::string testPath = "./files/tests/cpu/psxtest_cpu.exe";
+
+    try {
+        BIOS bios(biosPath);
+        RAM ram;
+        BUS bus(bios, ram);
+        CPU cpu(bus);
+
+        cpu.loadExecutable(testPath);
+
+        while (true) {
+            cpu.executeNextInstruction();
+        }
+
 
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;

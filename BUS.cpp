@@ -1,19 +1,27 @@
-#include "Interconnect.h"
+#include "BUS.h"
 
-Interconnect::Interconnect(BIOS bios, RAM ram) : bios(bios), ram(ram) {
+BUS::BUS(BIOS bios, RAM ram) : bios(bios), ram(ram) {
 
 }
 
-uint32_t Interconnect::load32(uint32_t address) const {
+uint32_t BUS::load32(uint32_t address) const {
 	if (address % 4 != 0) {
-		throw std::runtime_error("Unaligned address at Interconnect::load32: " + Utils::wordToString(address));
+		throw std::runtime_error("Unaligned address at BUS::load32: " + Utils::wordToString(address));
 	}
 
 	uint32_t absAddress = Utils::maskRegion(address);
 	std::optional<uint32_t> offset = Constants::BIOS_RANGE.contains(absAddress);
 
 	if (offset.has_value()) {
+		////std::cout << "Loading 32 bits from BIOS, offset=" << offset.value() << std::endl;
 		return bios.load32(offset.value());
+	}
+
+	offset = Constants::RAM_RANGE.contains(absAddress);
+
+	if (offset.has_value()) {
+		//std::cout << "Loading 32 bits from RAM, offset=" << offset.value() << std::endl;
+		return ram.load32(offset.value());
 	}
 
 	offset = Constants::IRQ_CONTROL_RANGE.contains(absAddress);
@@ -41,10 +49,10 @@ uint32_t Interconnect::load32(uint32_t address) const {
 		}
 	}
 
-	throw std::runtime_error("Error at Interconnect::load32 with address: " + Utils::wordToString(address));
+	//std::cout << "Error at BUS::load32 with address: " << Utils::wordToString(address) << std::endl;
 }
 
-uint16_t Interconnect::load16(uint32_t address) const {
+uint16_t BUS::load16(uint32_t address) const {
 	uint32_t absAddress = Utils::maskRegion(address);
 	std::optional<uint32_t> offset = Constants::SPU_RANGE.contains(absAddress);
 
@@ -66,10 +74,10 @@ uint16_t Interconnect::load16(uint32_t address) const {
 		return 0;
 	}
 
-	throw std::runtime_error("Error at Interconnect::load16 with address: " + Utils::wordToString(address));
+	//std::cout << "Error at BUS::load16 with address: " << Utils::wordToString(address) << std::endl;
 }
 
-uint8_t Interconnect::load8(uint32_t address) const {
+uint8_t BUS::load8(uint32_t address) const {
 	uint32_t absAddress = Utils::maskRegion(address);
 	std::optional<uint32_t> offset = Constants::RAM_RANGE.contains(absAddress);
 
@@ -91,13 +99,13 @@ uint8_t Interconnect::load8(uint32_t address) const {
 	}
 
 
-	throw std::runtime_error("Error at Interconnect::load32 with address: " + Utils::wordToString(address));
+	//std::cout << "Error at BUS::load8 with address: " << Utils::wordToString(address) << std::endl;
 }
 
 
-void Interconnect::store32(uint32_t address, uint32_t value) {
+void BUS::store32(uint32_t address, uint32_t value) {
 	if (address % 4 != 0) {
-		throw std::runtime_error("Unaligned address at Interconnect::store32: " + Utils::wordToString(address));
+		throw std::runtime_error("Unaligned address at BUS::store32: " + Utils::wordToString(address));
 	}
 
 	uint32_t absAddress = Utils::maskRegion(address);
@@ -122,10 +130,24 @@ void Interconnect::store32(uint32_t address, uint32_t value) {
 		return;
 	}
 
+	offset = Constants::RAM_RANGE.contains(absAddress);
+
+	if (offset.has_value()) {
+		ram.store32(offset.value(), value);
+		return;
+	}
+
 	offset = Constants::IRQ_CONTROL_RANGE.contains(absAddress);
 
 	if (offset.has_value()) {
 		// IRQ CONTROL not implemented.
+		return;
+	}
+
+	offset = Constants::RAM_CONFIG_REG_RANGE.contains(absAddress);
+
+	if (offset.has_value()) {
+		// Ram config not implemented
 		return;
 	}
 
@@ -150,12 +172,19 @@ void Interconnect::store32(uint32_t address, uint32_t value) {
 		return;
 	}
 
-	throw std::runtime_error("Error at Interconnect::store32 with address: " + Utils::wordToString(address));
+	offset = Constants::CACHE_CONTROL_RANGE.contains(absAddress);
+
+	if (offset.has_value()) {
+		// Cache write
+		return;
+	}
+
+	throw std::runtime_error("Error at BUS::store32 with address: " + Utils::wordToString(address));
 }
 
-void Interconnect::store16(uint32_t address, uint16_t value) {
+void BUS::store16(uint32_t address, uint16_t value) {
 	if (address % 2 != 0) {
-		throw std::runtime_error("Unaligned address at Interconnect::store16: " + Utils::wordToString(address));
+		throw std::runtime_error("Unaligned address at BUS::store16: " + Utils::wordToString(address));
 	}
 
 	uint32_t absAddress = Utils::maskRegion(address);
@@ -187,10 +216,10 @@ void Interconnect::store16(uint32_t address, uint16_t value) {
 		return;
 	}
 
-	throw std::runtime_error("Error at Interconnect::store16 with address: " + Utils::wordToString(address));
+	throw std::runtime_error("Error at BUS::store16 with address: " + Utils::wordToString(address));
 }
 
-void Interconnect::store8(uint32_t address, uint8_t value) {
+void BUS::store8(uint32_t address, uint8_t value) {
 	uint32_t absAddress = Utils::maskRegion(address);
 	std::optional<uint32_t> offset = Constants::RAM_RANGE.contains(absAddress);
 
@@ -206,5 +235,5 @@ void Interconnect::store8(uint32_t address, uint8_t value) {
 		return;
 	}
 
-	throw std::runtime_error("Error at Interconnect::store8 with address: " + Utils::wordToString(address));
+	throw std::runtime_error("Error at BUS::store8 with address: " + Utils::wordToString(address));
 }

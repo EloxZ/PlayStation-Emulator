@@ -1,12 +1,16 @@
+#pragma once
+
 #include "BIOS.h"
 #include "CPU.h"
-#include "Interconnect.h"
+#include "BUS.h"
 
 #include <iostream>
 #include <cstdint>
 #include <iomanip>
 
 void runTests();
-void testBIOS();
-void testFetching();
+void testReadBIOSFile();
+void testExecuteBIOS();
+void testCPUoperations();
+
 void testAddWithSignedOverflowCheck();

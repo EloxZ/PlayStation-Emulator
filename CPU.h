@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Constants.h"
-#include "Interconnect.h"
+#include "BUS.h"
 #include "Instruction.h"
 #include "Utils.h"
 
@@ -14,7 +14,7 @@
 
 class CPU {
 	public:
-		CPU(Interconnect inter);
+		CPU(BUS bus);
 
 		enum Exception {
 			SYS_CALL = 0x8,
@@ -29,6 +29,7 @@ class CPU {
 		void start();
 		void reset();
 		void executeNextInstruction();
+		void loadExecutable(std::string path);
 
 		void setClockFreq(float newClockFreq);
 
@@ -36,7 +37,7 @@ class CPU {
 		uint32_t regs[32] = {0xfefefefe};
 		uint32_t outRegs[32] = {0xfefefefe};
 		std::tuple<uint32_t, uint32_t> load = std::make_tuple(0, 0);
-		Interconnect inter;
+		BUS bus;
 		uint32_t PC = Constants::BIOS_ADDRESS;
 		uint32_t currentPC = PC; // In case of exception
 		uint32_t nextPC = PC + 4;
@@ -142,5 +143,10 @@ class CPU {
 		void op_cop3(Instruction instruction); // not supported
 		void op_lwc3(Instruction instruction); // not supported
 		void op_swc3(Instruction instruction); // not supported
+
+		// BIOS Functions
+		void listenBIOSfunction() const;
+		void puts() const;
+		void putchar(char c) const;
 };
 
